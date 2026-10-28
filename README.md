@@ -11,6 +11,10 @@
   <br />This is a <b>fork</b> of the MultiMC Launcher and is <b>not</b> endorsed by it.
 </p>
 
+## About this fork
+
+This is a personal fork and custom build of [Prism Launcher](https://github.com/PrismLauncher/PrismLauncher), maintained by [deanxbox](https://github.com/deanxbox) for my own needs. It is not an official build and is not supported by the Prism Launcher team. Changes so far: screenshot date filtering with GIF display, and a "hide installed" filter that also matches mods installed from the other platform (Modrinth/CurseForge).
+
 ## Installation
 
 - All downloads and instructions for Prism Launcher can be found on our [Website](https://prismlauncher.org/download).
