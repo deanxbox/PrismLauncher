@@ -69,7 +69,7 @@ std::pair<Net::Request::Ptr, QString*> makeUpload(ScreenShot::Ptr shot)
 
         QHttpPart filePart;
         filePart.setBodyDevice(file);
-        filePart.setHeader(QNetworkRequest::ContentTypeHeader, "image/png");
+        filePart.setHeader(QNetworkRequest::ContentTypeHeader, shot->m_file.suffix().compare("gif", Qt::CaseInsensitive) == 0 ? "image/gif" : "image/png");
         filePart.setHeader(QNetworkRequest::ContentDispositionHeader, R"(form-data; name="image"; filename=")" + file->fileName() + "\"");
 
         QHttpPart typePart;

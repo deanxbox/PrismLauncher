@@ -51,6 +51,10 @@
 #include <QPainter>
 #include <QRegularExpression>
 #include <QSet>
+#include <QCheckBox>
+#include <QDateEdit>
+#include <QHBoxLayout>
+#include <QSortFilterProxyModel>
 #include <QStyledItemDelegate>
 #include <memory>
 #include <utility>
@@ -113,7 +117,7 @@ class ThumbnailRunnable : public QRunnable {
         if (info.isDir()) {
             return;
         }
-        if (info.suffix().compare("png", Qt::CaseInsensitive) != 0) {
+        if (info.suffix().compare("png", Qt::CaseInsensitive) != 0 && info.suffix().compare("gif", Qt::CaseInsensitive) != 0) {
             return;
         }
         if (!m_cache->stale(m_path)) {
@@ -150,15 +154,38 @@ class ThumbnailRunnable : public QRunnable {
 
 // this is about as elegant and well written as a bag of bricks with scribbles done by insane
 // asylum patients.
-class FilterModel : public QIdentityProxyModel {
+class FilterModel : public QSortFilterProxyModel {
     Q_OBJECT
    public:
-    explicit FilterModel(QObject* parent = nullptr) : QIdentityProxyModel(parent)
+    explicit FilterModel(QObject* parent = nullptr) : QSortFilterProxyModel(parent)
     {
         m_thumbnailingPool.setMaxThreadCount(4);
         m_thumbnailCache = std::make_shared<SharedIconCache>();
         m_thumbnailCache->add("placeholder", QIcon::fromTheme("screenshot-placeholder"));
         connect(&watcher, &QFileSystemWatcher::fileChanged, this, &FilterModel::fileChanged);
+    }
+    void setDateRange(const QDate& from, const QDate& to)
+    {
+        m_from = from;
+        m_to = to;
+        invalidateFilter();
+    }
+    bool filterAcceptsRow(int row, const QModelIndex& parent) const override
+    {
+        if (!m_from.isValid() && !m_to.isValid()) {
+            return true;
+        }
+        const auto* fs = qobject_cast<QFileSystemModel*>(sourceModel());
+        if (!fs) {
+            return true;
+        }
+        // same timestamp the page sorts by
+        const auto idx = fs->index(row, 0, parent);
+        if (fs->isDir(idx)) {
+            return true;  // keep ancestors of the root folder visible
+        }
+        const QDate date = fs->lastModified(idx).date();
+        return (!m_from.isValid() || date >= m_from) && (!m_to.isValid() || date <= m_to);
     }
     ~FilterModel() override
     {
@@ -175,7 +202,7 @@ class FilterModel : public QIdentityProxyModel {
         }
         if (role == Qt::DisplayRole || role == Qt::EditRole) {
             const QVariant result = model->data(mapToSource(proxyIndex), role);
-            static const QRegularExpression s_removeChars("\\.png$");
+            static const QRegularExpression s_removeChars("\\.(png|gif)$", QRegularExpression::CaseInsensitiveOption);
             return result.toString().remove(s_removeChars);
         }
         if (role == Qt::DecorationRole) {
@@ -210,7 +237,7 @@ class FilterModel : public QIdentityProxyModel {
             static_cast<QFileSystemModel*>(model)->setNameFilterDisables(true);
             static_cast<QFileSystemModel*>(model)->setNameFilterDisables(false);
         }
-        return model->setData(mapToSource(index), value.toString() + ".png", role);
+        return model->setData(mapToSource(index), value.toString() + "." + static_cast<QFileSystemModel*>(model)->fileInfo(mapToSource(index)).suffix(), role);
     }
 
    private:
@@ -222,7 +249,11 @@ class FilterModel : public QIdentityProxyModel {
         m_thumbnailingPool.start(runnable);
     }
    private slots:
-    void thumbnailReady(const QString& /*path*/) { emit layoutChanged(); }
+    void thumbnailReady(const QString& /*path*/) {
+        if (rowCount() > 0) {
+            emit dataChanged(index(0, 0), index(rowCount() - 1, 0), { Qt::DecorationRole });
+        }
+    }
     void thumbnailFailed(const QString& path) { m_failed.insert(path); }
     void fileChanged(const QString& filepath)
     {
@@ -237,6 +268,7 @@ class FilterModel : public QIdentityProxyModel {
 
    private:
     SharedIconCachePtr m_thumbnailCache;
+    QDate m_from, m_to;
     QThreadPool m_thumbnailingPool;
     QSet<QString> m_failed;
     QSet<QString> watched;
@@ -267,7 +299,7 @@ ScreenshotsPage::ScreenshotsPage(QString path, QWidget* parent)
     m_filterModel->setSourceModel(m_model.get());
     m_model->setFilter(QDir::Files);
     m_model->setReadOnly(false);
-    m_model->setNameFilters({ "*.png" });
+    m_model->setNameFilters({ "*.png", "*.gif" });
     m_model->setNameFilterDisables(false);
     // Sorts by modified date instead of creation date because that column is not available and would require subclassing, this should work
     // considering screenshots aren't modified after creation.
@@ -292,6 +324,38 @@ ScreenshotsPage::ScreenshotsPage(QString path, QWidget* parent)
     ui->listView->setContextMenuPolicy(Qt::CustomContextMenu);
     connect(ui->listView, &QListView::customContextMenuRequested, this, &ScreenshotsPage::showContextMenu);
     connect(ui->listView, &QAbstractItemView::activated, this, &ScreenshotsPage::onItemActivated);
+
+    // Date filter row above the list; a date is only applied while its checkbox is ticked.
+    auto* row = new QHBoxLayout();
+    auto* fromBox = new QCheckBox(tr("From"), this);
+    auto* toBox = new QCheckBox(tr("To"), this);
+    auto* fromEdit = new QDateEdit(QDate::currentDate(), this);
+    auto* toEdit = new QDateEdit(QDate::currentDate(), this);
+    for (auto* edit : { fromEdit, toEdit }) {
+        edit->setCalendarPopup(true);
+        edit->setEnabled(false);
+    }
+    for (auto* w : QList<QWidget*>{ fromBox, fromEdit, toBox, toEdit }) {
+        row->addWidget(w);
+    }
+    row->addStretch();
+    auto applyFilter = [this, fromBox, toBox, fromEdit, toEdit] {
+        fromEdit->setEnabled(fromBox->isChecked());
+        toEdit->setEnabled(toBox->isChecked());
+        static_cast<FilterModel*>(m_filterModel.get())
+            ->setDateRange(fromBox->isChecked() ? fromEdit->date() : QDate(), toBox->isChecked() ? toEdit->date() : QDate());
+    };
+    connect(fromBox, &QCheckBox::toggled, this, applyFilter);
+    connect(toBox, &QCheckBox::toggled, this, applyFilter);
+    connect(fromEdit, &QDateEdit::dateChanged, this, applyFilter);
+    connect(toEdit, &QDateEdit::dateChanged, this, applyFilter);
+    ui->horizontalLayout->setDirection(QBoxLayout::TopToBottom);
+    ui->horizontalLayout->insertLayout(0, row);
+}
+
+QModelIndex ScreenshotsPage::toSource(const QModelIndex& viewIndex) const
+{
+    return m_filterModel->mapToSource(viewIndex);
 }
 
 bool ScreenshotsPage::eventFilter(QObject* obj, QEvent* evt)
@@ -356,7 +420,7 @@ void ScreenshotsPage::onItemActivated(QModelIndex index) const
     if (!index.isValid()) {
         return;
     }
-    const auto info = m_model->fileInfo(index);
+    const auto info = m_model->fileInfo(toSource(index));
     DesktopServices::openPath(info);
 }
 
@@ -371,7 +435,7 @@ void ScreenshotsPage::onCurrentSelectionChanged(const QItemSelection& /*selected
         if (!index.isValid()) {
             break;
         }
-        auto info = m_model->fileInfo(index);
+        auto info = m_model->fileInfo(toSource(index));
         if (!info.isReadable()) {
             allReadable = false;
         }
@@ -429,7 +493,7 @@ void ScreenshotsPage::on_actionUpload_triggered()
 
     if (selection.size() < 2) {
         auto item = selection.at(0);
-        auto info = m_model->fileInfo(item);
+        auto info = m_model->fileInfo(toSource(item));
         auto screenshot = std::make_shared<ScreenShot>(info);
         auto [uploadRequest, result] = ImgurAPI::makeUpload(screenshot);
         job->addNetAction(uploadRequest);
@@ -457,7 +521,7 @@ void ScreenshotsPage::on_actionUpload_triggered()
     }
 
     for (auto item : selection) {
-        auto info = m_model->fileInfo(item);
+        auto info = m_model->fileInfo(toSource(item));
         auto screenshot = std::make_shared<ScreenShot>(info);
         uploaded.push_back(screenshot);
         auto uploadRequest = ImgurAPI::makeUpload(screenshot).first;
@@ -502,7 +566,7 @@ void ScreenshotsPage::on_actionCopy_Image_triggered() const
 
     // You can only copy one image to the clipboard. In the case of multiple selected files, only the first one gets copied.
     const auto item = selection.first();
-    const auto info = m_model->fileInfo(item);
+    const auto info = m_model->fileInfo(toSource(item));
     const QImage image(info.absoluteFilePath());
     Q_ASSERT(!image.isNull());
     QApplication::clipboard()->setImage(image, QClipboard::Clipboard);
@@ -518,7 +582,7 @@ void ScreenshotsPage::on_actionCopy_File_s_triggered() const
 
     QString buf = "";
     for (auto item : selection) {
-        auto info = m_model->fileInfo(item);
+        auto info = m_model->fileInfo(toSource(item));
         buf += "file:///" + info.absoluteFilePath() + "\r\n";
     }
     auto* mimeData = new QMimeData();
@@ -552,11 +616,11 @@ void ScreenshotsPage::on_actionDelete_triggered()
     }
 
     for (auto item : selected) {
-        if (FS::trash(m_model->filePath(item))) {
+        if (FS::trash(m_model->filePath(toSource(item)))) {
             continue;
         }
 
-        m_model->remove(item);
+        m_model->remove(toSource(item));
     }
 }
 

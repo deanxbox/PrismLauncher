@@ -39,7 +39,7 @@
 
 #include "ui/pages/BasePage.h"
 
-class QIdentityProxyModel;
+class QSortFilterProxyModel;
 class QItemSelection;
 namespace Ui {
 class ScreenshotsPage;
@@ -86,7 +86,8 @@ class ScreenshotsPage : public QMainWindow, public BasePage {
    private:
     Ui::ScreenshotsPage* ui;
     std::shared_ptr<ScreenshotsFSModel> m_model;
-    std::shared_ptr<QIdentityProxyModel> m_filterModel;
+    std::shared_ptr<QSortFilterProxyModel> m_filterModel;
+    QModelIndex toSource(const QModelIndex& viewIndex) const;
     QString m_folder;
     bool m_valid = false;
     bool m_uploadActive = false;
