@@ -9,6 +9,7 @@
 #include <QList>
 #include <QMessageBox>
 #include <QPixmapCache>
+#include <QRegularExpression>
 #include <QUrl>
 #include <algorithm>
 #include <memory>
@@ -43,6 +44,16 @@ ResourceModel::~ResourceModel()
     s_runningModels.find(this).value() = false;
 }
 
+namespace {
+bool sameMod(const QString& a, const QString& b)
+{
+    static const QRegularExpression nonAlnum("[^a-z0-9]");
+    // Metadata slugs are index file names ("jei.pw.toml"), so drop the suffix first.
+    auto na = a.toLower().remove(".pw.toml").remove(nonAlnum);
+    return !na.isEmpty() && na == b.toLower().remove(".pw.toml").remove(nonAlnum);
+}
+}  // namespace
+
 bool ResourceModel::isPackInstalled(ModPlatform::IndexedPack::Ptr pack) const
 {
     if (!m_resourceList) {
@@ -51,8 +62,15 @@ bool ResourceModel::isPackInstalled(ModPlatform::IndexedPack::Ptr pack) const
 
     for (qsizetype i = 0; i < m_resourceList->size(); ++i) {
         auto& resource = m_resourceList->at(i);
-        if (auto meta = resource.metadata(); meta && meta->provider == pack->provider && meta->projectId == pack->addonId) {
-            return true;
+        if (auto meta = resource.metadata(); meta) {
+            if (meta->provider == pack->provider && meta->projectId == pack->addonId) {
+                return true;
+            }
+            // Same mod installed from the other platform: match on normalized slug or name.
+            // shortcut: heuristic, can false-match unrelated mods sharing a name; upgrade to file hashes if that bites.
+            if (meta->provider != pack->provider && (sameMod(meta->slug, pack->slug) || sameMod(meta->name, pack->name))) {
+                return true;
+            }
         }
     }
     return false;
