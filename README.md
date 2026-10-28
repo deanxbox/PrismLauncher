@@ -13,7 +13,12 @@
 
 ## About this fork
 
-This is a personal fork and custom build of [Prism Launcher](https://github.com/PrismLauncher/PrismLauncher), maintained by [deanxbox](https://github.com/deanxbox) for my own needs. It is not an official build and is not supported by the Prism Launcher team. Changes so far: screenshot date filtering with GIF display, and a "hide installed" filter that also matches mods installed from the other platform (Modrinth/CurseForge).
+This is a personal fork and custom build of [Prism Launcher](https://github.com/PrismLauncher/PrismLauncher), maintained by [deanxbox](https://github.com/deanxbox) for my own needs. It is not an official build and is not supported by the Prism Launcher team.
+
+Changes compared to upstream:
+
+- **Screenshots page:** filter screenshots by date, and display GIF screenshots (thumbnails and copy-image use the first frame; the date uses the file modified time).
+- **Download mods dialog:** the "hide installed" filter and the "installed" badge also recognise a mod installed from the other platform (Modrinth or CurseForge). Matching uses file hashes, with a name/slug comparison as a fallback.
 
 ## Installation
 
