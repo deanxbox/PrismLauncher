@@ -7,6 +7,7 @@
 #include <optional>
 
 #include <QAbstractListModel>
+#include <QSet>
 #include <utility>
 
 #include "QObjectPtr.h"
@@ -148,6 +149,16 @@ class ResourceModel : public QAbstractListModel {
     void versionRequestSucceeded(QVector<ModPlatform::IndexedVersion>&, const QVariant&, const QModelIndex&);
 
     void infoRequestSucceeded(ModPlatform::IndexedPack::Ptr, const QModelIndex&);
+
+   private:
+    /** Hash installed files and ask the other platform which project they belong to (once per model). */
+    void startHashLookup();
+    void hashLookupDone();
+
+    bool m_hashLookupStarted = false;
+    QSet<QString> m_hashMatchedModrinth;
+    QSet<QString> m_hashMatchedFlame;
+    QList<Task::Ptr> m_hashLookupTasks;
 
    signals:
     void versionListUpdated(const QModelIndex& index);

@@ -8,7 +8,12 @@
 #include <QIcon>
 #include <QList>
 #include <QMessageBox>
+#include <QFutureWatcher>
+#include <QJsonArray>
+#include <QJsonDocument>
+#include <QJsonObject>
 #include <QPixmapCache>
+#include <QtConcurrentRun>
 #include <QRegularExpression>
 #include <QUrl>
 #include <algorithm>
@@ -21,6 +26,9 @@
 
 #include "minecraft/mod/ResourceFolderModel.h"
 #include "modplatform/ModIndex.h"
+#include "modplatform/flame/FlameAPI.h"
+#include "modplatform/helpers/HashUtils.h"
+#include "modplatform/modrinth/ModrinthAPI.h"
 #include "modplatform/ResourceAPI.h"
 #include "net/ApiRequest.h"
 #include "net/NetJob.h"
@@ -47,10 +55,12 @@ ResourceModel::~ResourceModel()
 namespace {
 bool sameMod(const QString& a, const QString& b)
 {
+    // Drop ".pw.toml", "(...)" tags and trailing loader/API words ("-fabric", " API") that only one platform adds.
+    static const QRegularExpression extra(R"(\.pw\.toml|\([^)]*\)|[-_ ](fabric|forge|neoforge|quilt|api)\b)");
     static const QRegularExpression nonAlnum("[^a-z0-9]");
-    // Metadata slugs are index file names ("jei.pw.toml"), so drop the suffix first.
-    auto na = a.toLower().remove(".pw.toml").remove(nonAlnum);
-    return !na.isEmpty() && na == b.toLower().remove(".pw.toml").remove(nonAlnum);
+    auto norm = [](QString s) { return s.toLower().remove(extra).remove(extra).remove(nonAlnum); };
+    auto na = norm(a);
+    return !na.isEmpty() && na == norm(b);
 }
 }  // namespace
 
@@ -58,6 +68,11 @@ bool ResourceModel::isPackInstalled(ModPlatform::IndexedPack::Ptr pack) const
 {
     if (!m_resourceList) {
         return false;
+    }
+
+    // Exact match: an installed file's hash resolved to this project on this platform.
+    if ((pack->provider == ModPlatform::ResourceProvider::MODRINTH ? m_hashMatchedModrinth : m_hashMatchedFlame).contains(pack->addonId.toString())) {
+        return true;
     }
 
     for (qsizetype i = 0; i < m_resourceList->size(); ++i) {
@@ -76,10 +91,121 @@ bool ResourceModel::isPackInstalled(ModPlatform::IndexedPack::Ptr pack) const
     return false;
 }
 
+namespace {
+struct FileHashes {
+    QStringList sha;
+    QStringList murmur;
+};
+}  // namespace
+
+void ResourceModel::startHashLookup()
+{
+    if (m_hashLookupStarted || !m_resourceList || m_resourceList->empty()) {
+        return;
+    }
+    m_hashLookupStarted = true;
+
+    // A file already tracked by a platform's metadata doesn't need looking up on that same platform.
+    QStringList forModrinth;
+    QStringList forFlame;
+    for (qsizetype i = 0; i < m_resourceList->size(); ++i) {
+        const auto& resource = m_resourceList->at(i);
+        if (!resource.fileinfo().isFile()) {
+            continue;
+        }
+        const auto path = resource.fileinfo().absoluteFilePath();
+        const auto meta = resource.metadata();
+        if (!meta || meta->provider != ModPlatform::ResourceProvider::MODRINTH) {
+            forModrinth << path;
+        }
+        if (!meta || meta->provider != ModPlatform::ResourceProvider::FLAME) {
+            forFlame << path;
+        }
+    }
+
+    const auto hashType = ModPlatform::ProviderCapabilities::hashType(ModPlatform::ResourceProvider::MODRINTH).first();
+
+    auto* watcher = new QFutureWatcher<FileHashes>(this);
+    connect(watcher, &QFutureWatcherBase::finished, this, [this, watcher, hashType] {
+        const auto hashes = watcher->result();
+        watcher->deleteLater();
+
+        if (!hashes.sha.isEmpty()) {
+            auto lookup = ModrinthAPI::currentVersions(hashes.sha, hashType);
+            auto task = lookup.first;
+            auto* response = lookup.second;
+            if (task) {
+                connect(task.get(), &Task::succeeded, this, [this, response] {
+                    // The response maps each file hash to a version object; its project_id is the Modrinth project.
+                    const auto versions = QJsonDocument::fromJson(*response).object();
+                    for (const auto& version : versions) {
+                        m_hashMatchedModrinth.insert(version.toObject()["project_id"].toString());
+                    }
+                    hashLookupDone();
+                });
+                m_hashLookupTasks << task;
+                task->start();
+            }
+        }
+
+        if (!hashes.murmur.isEmpty()) {
+            QList<uint> fingerprints;
+            for (const auto& murmur : hashes.murmur) {
+                fingerprints << murmur.toUInt();
+            }
+            auto lookup = FlameAPI::matchFingerprints(fingerprints);
+            auto task = lookup.first;
+            auto* response = lookup.second;
+            connect(task.get(), &Task::succeeded, this, [this, response] {
+                const auto matches = QJsonDocument::fromJson(*response).object()["data"].toObject()["exactMatches"].toArray();
+                for (const auto& match : matches) {
+                    m_hashMatchedFlame.insert(QString::number(match.toObject()["file"].toObject()["modId"].toInteger()));
+                }
+                hashLookupDone();
+            });
+            m_hashLookupTasks << task;
+            task->start();
+        }
+    });
+
+    watcher->setFuture(QtConcurrent::run([forModrinth, forFlame, hashType] {
+        FileHashes hashes;
+        const auto algorithm = Hashing::algorithmFromString(hashType);
+        for (const auto& path : forModrinth) {
+            if (auto h = Hashing::hash(path, algorithm); !h.isEmpty()) {
+                hashes.sha << h;
+            }
+        }
+        for (const auto& path : forFlame) {
+            if (auto h = Hashing::hash(path, Hashing::Algorithm::Murmur2); !h.isEmpty()) {
+                hashes.murmur << h;
+            }
+        }
+        return hashes;
+    }));
+}
+
+void ResourceModel::hashLookupDone()
+{
+    if (m_packs.isEmpty()) {
+        return;
+    }
+    emit dataChanged(index(0), index(static_cast<int>(m_packs.size()) - 1), { UserDataTypes::INSTALLED });
+    // Results may have loaded before the lookup finished; search again so "hide installed" applies to them.
+    if (std::ranges::any_of(m_packs, [this](const auto& pack) { return !checkFilters(pack); })) {
+        refresh();
+    }
+}
+
 QVariant ResourceModel::getInstalledPackVersion(ModPlatform::IndexedPack::Ptr pack) const
 {
     if (!m_resourceList) {
         return {};
+    }
+
+    // Exact match: an installed file's hash resolved to this project on this platform.
+    if ((pack->provider == ModPlatform::ResourceProvider::MODRINTH ? m_hashMatchedModrinth : m_hashMatchedFlame).contains(pack->addonId.toString())) {
+        return true;
     }
 
     for (qsizetype i = 0; i < m_resourceList->size(); ++i) {
@@ -188,6 +314,7 @@ void ResourceModel::fetchMore(const QModelIndex& parent)
 
 void ResourceModel::search()
 {
+    startHashLookup();
     if (hasActiveSearchJob()) {
         return;
     }
