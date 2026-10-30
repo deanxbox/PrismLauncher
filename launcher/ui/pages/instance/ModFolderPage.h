@@ -70,7 +70,6 @@ class ModFolderPage : public ExternalResourcesPage {
     void downloadDialogFinished(int result);
     void updateMods(bool includeDeps = false, std::vector<ModPlatform::IndexedVersionType> releaseTypes = {});
     void deleteModMetadata();
-    void exportModMetadata();
     void changeModVersion();
 
    protected:

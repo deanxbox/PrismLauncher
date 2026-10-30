@@ -3,6 +3,7 @@ include(ECMMarkAsTest)
 include(ECMMarkNonGuiExecutable)
 
 set(TEST_SOURCES
+    ExportToModList_test.cpp
     FileSystem_test.cpp
     GlobalOptions_test.cpp
     GZip_test.cpp

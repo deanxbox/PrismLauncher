@@ -11,7 +11,7 @@
    </rect>
   </property>
   <property name="windowTitle">
-   <string>Export Pack to ModList</string>
+   <string>Export List</string>
   </property>
   <property name="sizeGripEnabled">
    <bool>true</bool>
@@ -54,6 +54,11 @@
           </item>
           <item>
            <property name="text">
+            <string>Comma Separated List</string>
+           </property>
+          </item>
+          <item>
+           <property name="text">
             <string>Custom</string>
            </property>
           </item>
@@ -80,7 +85,7 @@
               </sizepolicy>
              </property>
              <property name="toolTip">
-                <string>This text supports the following placeholders:&#10;{name}     - Mod name&#10;{mod_id}   - Mod ID&#10;{url}      - Mod URL&#10;{version}  - Mod version&#10;{authors}  - Mod authors</string>
+                <string>This text supports the following placeholders:&#10;{name}     - Item name&#10;{mod_id}   - Mod ID (mods only)&#10;{url}      - Item URL&#10;{version}  - Item version&#10;{authors}  - Authors, when available&#10;{filename} - Filename</string>
              </property>
             </widget>
            </item>
@@ -209,7 +214,7 @@
      <item>
       <widget class="QLabel" name="warningLabel">
        <property name="text">
-        <string>This depends on the mods' metadata. To ensure it is available, run an update on the instance. Installing the updates isn't necessary.</string>
+        <string>This depends on the items' metadata. To ensure it is available, check for updates on this page. Installing the updates isn't necessary. Some fields may be unavailable for packs.</string>
        </property>
        <property name="wordWrap">
         <bool>true</bool>

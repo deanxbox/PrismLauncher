@@ -38,7 +38,6 @@
 
 #include "ModFolderPage.h"
 #include "minecraft/mod/Resource.h"
-#include "ui/dialogs/ExportToModListDialog.h"
 #include "ui/dialogs/InstallLoaderDialog.h"
 #include "ui_ExternalResourcesPage.h"
 
@@ -120,9 +119,7 @@ ModFolderPage::ModFolderPage(MinecraftInstance* inst, ModFolderModel* model, QWi
 
     m_ui->actionViewHomepage->setToolTip(tr("View the homepages of all selected mods."));
 
-    m_ui->actionExportMetadata->setToolTip(tr("Export mod's metadata to text."));
-    connect(m_ui->actionExportMetadata, &QAction::triggered, this, &ModFolderPage::exportModMetadata);
-    m_ui->actionsToolbar->insertActionAfter(m_ui->actionViewHomepage, m_ui->actionExportMetadata);
+    enableListExport();
 
     m_ui->actionsToolbar->insertActionAfter(m_ui->actionViewFolder, m_ui->actionViewConfigs);
     m_ui->actionsToolbar->insertActionAfter(m_ui->actionChangeVersion, m_ui->actionLockUpdates);
@@ -362,19 +359,6 @@ void ModFolderPage::changeModVersion()
 
     m_downloadDialog->setResourceMetadata((*modsList.begin())->metadata());
     m_downloadDialog->open();
-}
-
-void ModFolderPage::exportModMetadata()
-{
-    auto selection = m_filterModel->mapSelectionToSource(m_ui->treeView->selectionModel()->selection()).indexes();
-    auto selectedMods = m_model->selectedMods(selection);
-    if (selectedMods.length() == 0) {
-        selectedMods = m_model->allMods();
-    }
-
-    std::ranges::sort(selectedMods, [](const Mod* a, const Mod* b) { return a->name() < b->name(); });
-    ExportToModListDialog dlg(m_instance->name(), selectedMods, this);
-    dlg.exec();
 }
 
 CoreModFolderPage::CoreModFolderPage(MinecraftInstance* inst, ModFolderModel* mods, QWidget* parent) : ModFolderPage(inst, mods, parent)

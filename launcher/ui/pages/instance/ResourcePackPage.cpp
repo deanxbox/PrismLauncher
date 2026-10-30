@@ -45,6 +45,8 @@
 ResourcePackPage::ResourcePackPage(MinecraftInstance* instance, ResourcePackFolderModel* model, QWidget* parent)
     : ExternalResourcesPage(instance, model, parent), m_model(model)
 {
+    enableListExport();
+
     m_ui->actionDownloadItem->setText(tr("Download Packs"));
     m_ui->actionDownloadItem->setToolTip(tr("Download resource packs from online mod platforms"));
     m_ui->actionDownloadItem->setEnabled(true);

@@ -21,7 +21,14 @@
 #include <QJsonObject>
 
 namespace {
-QString toHTML(const QList<Mod*>& mods, ExportToModList::OptionalData extraData)
+QStringList authorsOf(const Resource* resource)
+{
+    if (const auto* mod = dynamic_cast<const Mod*>(resource))
+        return mod->authors();
+    return {};
+}
+
+QString toHTML(const QList<Resource*>& mods, ExportToModList::OptionalData extraData)
 {
     QStringList lines;
     for (auto* mod : mods) {
@@ -43,8 +50,8 @@ QString toHTML(const QList<Mod*>& mods, ExportToModList::OptionalData extraData)
                 line += QString(" [%1]").arg(ver.toHtmlEscaped());
             }
         }
-        if ((extraData & ExportToModList::Authors) != 0 && !mod->authors().isEmpty()) {
-            line += " by " + mod->authors().join(", ").toHtmlEscaped();
+        if ((extraData & ExportToModList::Authors) != 0 && !authorsOf(mod).isEmpty()) {
+            line += " by " + authorsOf(mod).join(", ").toHtmlEscaped();
         }
         if ((extraData & ExportToModList::FileName) != 0) {
             line += QString(" (%1)").arg(mod->fileinfo().fileName().toHtmlEscaped());
@@ -63,7 +70,7 @@ QString toMarkdownEscaped(QString src)
     return src;
 }
 
-QString toMarkdown(const QList<Mod*>& mods, ExportToModList::OptionalData extraData)
+QString toMarkdown(const QList<Resource*>& mods, ExportToModList::OptionalData extraData)
 {
     QStringList lines;
 
@@ -86,8 +93,8 @@ QString toMarkdown(const QList<Mod*>& mods, ExportToModList::OptionalData extraD
                 line += QString(" [%1]").arg(ver);
             }
         }
-        if ((extraData & ExportToModList::Authors) != 0 && !mod->authors().isEmpty()) {
-            line += " by " + toMarkdownEscaped(mod->authors().join(", "));
+        if ((extraData & ExportToModList::Authors) != 0 && !authorsOf(mod).isEmpty()) {
+            line += " by " + toMarkdownEscaped(authorsOf(mod).join(", "));
         }
         if ((extraData & ExportToModList::FileName) != 0) {
             line += QString(" (%1)").arg(toMarkdownEscaped(mod->fileinfo().fileName()));
@@ -97,7 +104,7 @@ QString toMarkdown(const QList<Mod*>& mods, ExportToModList::OptionalData extraD
     return lines.join("\n");
 }
 
-QString toPlainTXT(const QList<Mod*>& mods, ExportToModList::OptionalData extraData)
+QString toPlainTXT(const QList<Resource*>& mods, ExportToModList::OptionalData extraData, const QString& separator = "\n")
 {
     QStringList lines;
     for (auto* mod : mods) {
@@ -120,18 +127,18 @@ QString toPlainTXT(const QList<Mod*>& mods, ExportToModList::OptionalData extraD
                 line += QString(" [%1]").arg(ver);
             }
         }
-        if (((extraData & ExportToModList::Authors) != 0) && !mod->authors().isEmpty()) {
-            line += " by " + mod->authors().join(", ");
+        if (((extraData & ExportToModList::Authors) != 0) && !authorsOf(mod).isEmpty()) {
+            line += " by " + authorsOf(mod).join(", ");
         }
         if ((extraData & ExportToModList::FileName) != 0) {
             line += QString(" (%1)").arg(mod->fileinfo().fileName());
         }
         lines << line;
     }
-    return lines.join("\n");
+    return lines.join(separator);
 }
 
-QString toJSON(const QList<Mod*>& mods, ExportToModList::OptionalData extraData)
+QString toJSON(const QList<Resource*>& mods, ExportToModList::OptionalData extraData)
 {
     QJsonArray lines;
     for (auto* mod : mods) {
@@ -154,8 +161,8 @@ QString toJSON(const QList<Mod*>& mods, ExportToModList::OptionalData extraData)
                 line["version"] = ver;
             }
         }
-        if (((extraData & ExportToModList::Authors) != 0) && !mod->authors().isEmpty()) {
-            line["authors"] = QJsonArray::fromStringList(mod->authors());
+        if (((extraData & ExportToModList::Authors) != 0) && !authorsOf(mod).isEmpty()) {
+            line["authors"] = QJsonArray::fromStringList(authorsOf(mod));
         }
         if ((extraData & ExportToModList::FileName) != 0) {
             line["filename"] = mod->fileinfo().fileName();
@@ -167,7 +174,7 @@ QString toJSON(const QList<Mod*>& mods, ExportToModList::OptionalData extraData)
     return doc.toJson();
 }
 
-QString toCSV(const QList<Mod*>& mods, ExportToModList::OptionalData extraData)
+QString toCSV(const QList<Resource*>& mods, ExportToModList::OptionalData extraData)
 {
     QStringList lines;
     for (auto* mod : mods) {
@@ -188,10 +195,10 @@ QString toCSV(const QList<Mod*>& mods, ExportToModList::OptionalData extraData)
         }
         if ((extraData & ExportToModList::Authors) != 0) {
             QString authors;
-            if (mod->authors().length() == 1) {
-                authors = mod->authors().back();
-            } else if (mod->authors().length() > 1) {
-                authors = QString("\"%1\"").arg(mod->authors().join(","));
+            if (authorsOf(mod).length() == 1) {
+                authors = authorsOf(mod).back();
+            } else if (authorsOf(mod).length() > 1) {
+                authors = QString("\"%1\"").arg(authorsOf(mod).join(","));
             }
             data << authors;
         }
@@ -205,7 +212,7 @@ QString toCSV(const QList<Mod*>& mods, ExportToModList::OptionalData extraData)
 }  // namespace
 namespace ExportToModList {
 
-QString exportToModList(const QList<Mod*>& mods, Formats format, OptionalData extraData)
+QString exportToModList(const QList<Resource*>& mods, Formats format, OptionalData extraData)
 {
     switch (format) {
         case HTML:
@@ -214,6 +221,8 @@ QString exportToModList(const QList<Mod*>& mods, Formats format, OptionalData ex
             return toMarkdown(mods, extraData);
         case PLAINTXT:
             return toPlainTXT(mods, extraData);
+        case COMMA_LIST:
+            return toPlainTXT(mods, extraData, ", ");
         case JSON:
             return toJSON(mods, extraData);
         case CSV:
@@ -224,19 +233,20 @@ QString exportToModList(const QList<Mod*>& mods, Formats format, OptionalData ex
     }
 }
 
-QString exportToModList(const QList<Mod*>& mods, const QString& lineTemplate)
+QString exportToModList(const QList<Resource*>& mods, const QString& lineTemplate)
 {
     QStringList lines;
     for (auto* mod : mods) {
         auto meta = mod->metadata();
         auto modName = mod->name();
-        auto modID = mod->modId();
+        const auto* actualMod = dynamic_cast<const Mod*>(mod);
+        const auto modID = actualMod ? actualMod->modId() : QString();
         auto url = mod->homepage();
         auto ver = mod->version();
         if (ver.isEmpty() && meta != nullptr) {
             ver = meta->version().toString();
         }
-        auto authors = mod->authors().join(", ");
+        auto authors = authorsOf(mod).join(", ");
         auto filename = mod->fileinfo().fileName();
         lines << QString(lineTemplate)
                      .replace("{name}", modName)

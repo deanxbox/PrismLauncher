@@ -22,10 +22,10 @@
 
 namespace ExportToModList {
 
-enum Formats : std::uint8_t { HTML, MARKDOWN, PLAINTXT, JSON, CSV, CUSTOM };
+enum Formats : std::uint8_t { HTML, MARKDOWN, PLAINTXT, JSON, CSV, COMMA_LIST, CUSTOM };
 enum OptionalDataValue : std::uint8_t { None = 0, Authors = 1U << 0U, Url = 1U << 1U, Version = 1U << 2U, FileName = 1U << 3U };
 Q_DECLARE_FLAGS(OptionalData, OptionalDataValue)
 
-QString exportToModList(const QList<Mod*>& mods, Formats format, OptionalData extraData);
-QString exportToModList(const QList<Mod*>& mods, const QString& lineTemplate);
+QString exportToModList(const QList<Resource*>& mods, Formats format, OptionalData extraData);
+QString exportToModList(const QList<Resource*>& mods, const QString& lineTemplate);
 }  // namespace ExportToModList

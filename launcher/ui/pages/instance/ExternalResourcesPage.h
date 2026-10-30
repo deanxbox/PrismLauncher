@@ -36,6 +36,9 @@ class ExternalResourcesPage : public QMainWindow, public BasePage {
     void retranslate() override;
 
    protected:
+    void enableListExport();
+    void exportResourceMetadata();
+
     bool event(QEvent* ev) override;
     bool eventFilter(QObject* obj, QEvent* ev) override;
     bool listFilter(QKeyEvent* keyEvent);

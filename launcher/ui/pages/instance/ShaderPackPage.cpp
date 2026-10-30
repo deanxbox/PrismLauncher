@@ -48,6 +48,8 @@
 ShaderPackPage::ShaderPackPage(MinecraftInstance* instance, ShaderPackFolderModel* model, QWidget* parent)
     : ExternalResourcesPage(instance, model, parent), m_model(model)
 {
+    enableListExport();
+
     m_ui->actionDownloadItem->setText(tr("Download Packs"));
     m_ui->actionDownloadItem->setToolTip(tr("Download shader packs from online mod platforms"));
     m_ui->actionDownloadItem->setEnabled(true);

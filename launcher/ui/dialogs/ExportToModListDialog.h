@@ -31,7 +31,7 @@ class ExportToModListDialog : public QDialog {
     Q_OBJECT
 
    public:
-    explicit ExportToModListDialog(QString name, QList<Mod*> mods, QWidget* parent = nullptr);
+    explicit ExportToModListDialog(QString name, QList<Resource*> mods, QWidget* parent = nullptr);
     ~ExportToModListDialog() override;
 
     void done(int result) override;
@@ -46,7 +46,7 @@ class ExportToModListDialog : public QDialog {
     QString extension();
     void enableCustom(bool enabled);
 
-    QList<Mod*> m_mods;
+    QList<Resource*> m_mods;
     bool m_templateChanged;
     QString m_name;
     ExportToModList::Formats m_format = ExportToModList::Formats::HTML;

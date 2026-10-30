@@ -38,9 +38,10 @@ const QHash<ExportToModList::Formats, QString> ExportToModListDialog::exampleLin
     { ExportToModList::PLAINTXT, "{name} ({url}) [{version}] by {authors}" },
     { ExportToModList::JSON, R"({"name":"{name}","url":"{url}","version":"{version}","authors":"{authors}"},)" },
     { ExportToModList::CSV, "{name},{url},{version},\"{authors}\"" },
+    { ExportToModList::COMMA_LIST, "{name}" },
 };
 
-ExportToModListDialog::ExportToModListDialog(QString name, QList<Mod*> mods, QWidget* parent)
+ExportToModListDialog::ExportToModListDialog(QString name, QList<Resource*> mods, QWidget* parent)
     : QDialog(parent), m_mods(std::move(mods)), m_templateChanged(false), m_name(std::move(name)), m_ui(new Ui::ExportToModListDialog)
 {
     m_ui->setupUi(this);
@@ -57,7 +58,7 @@ ExportToModListDialog::ExportToModListDialog(QString name, QList<Mod*> mods, QWi
     connect(m_ui->filenameButton, &QPushButton::clicked, this, [this](bool) { addExtra(ExportToModList::FileName); });
     connect(m_ui->templateText, &QTextEdit::textChanged, this, [this] {
         if (m_ui->templateText->toPlainText() != exampleLines[m_format]) {
-            m_ui->formatComboBox->setCurrentIndex(5);
+            m_ui->formatComboBox->setCurrentIndex(6);
         }
         triggerImp();
     });
@@ -110,6 +111,12 @@ void ExportToModListDialog::formatChanged(int index)
             break;
         }
         case 5: {
+            enableCustom(false);
+            m_ui->resultText->hide();
+            m_format = ExportToModList::COMMA_LIST;
+            break;
+        }
+        case 6: {
             m_templateChanged = true;
             enableCustom(true);
             m_ui->resultText->hide();
@@ -155,6 +162,7 @@ void ExportToModListDialog::triggerImp()
         case ExportToModList::PLAINTXT:
         case ExportToModList::JSON:
         case ExportToModList::CSV:
+        case ExportToModList::COMMA_LIST:
             break;
     }
     auto exampleLine = exampleLines[m_format];
@@ -193,6 +201,7 @@ QString ExportToModListDialog::extension()
             return ".md";
         case ExportToModList::PLAINTXT:
         case ExportToModList::CUSTOM:
+        case ExportToModList::COMMA_LIST:
             return ".txt";
         case ExportToModList::JSON:
             return ".json";

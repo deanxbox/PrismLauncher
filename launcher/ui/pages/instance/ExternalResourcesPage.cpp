@@ -36,6 +36,7 @@
 #include "ExternalResourcesPage.h"
 #include "ui/MultiDecorationItemDelegate.h"
 #include "ui/dialogs/CustomMessageBox.h"
+#include "ui/dialogs/ExportToModListDialog.h"
 #include "ui_ExternalResourcesPage.h"
 
 #include "DesktopServices.h"
@@ -47,6 +48,25 @@
 #include <QMenu>
 #include <QStyledItemDelegate>
 #include <algorithm>
+
+void ExternalResourcesPage::enableListExport()
+{
+    m_ui->actionExportMetadata->setToolTip(tr("Export selected items to a list (all items if none are selected)."));
+    connect(m_ui->actionExportMetadata, &QAction::triggered, this, &ExternalResourcesPage::exportResourceMetadata);
+    m_ui->actionsToolbar->insertActionAfter(m_ui->actionViewHomepage, m_ui->actionExportMetadata);
+}
+
+void ExternalResourcesPage::exportResourceMetadata()
+{
+    auto selection = m_filterModel->mapSelectionToSource(m_ui->treeView->selectionModel()->selection()).indexes();
+    auto resources = m_model->selectedResources(selection);
+    if (resources.isEmpty())
+        resources = m_model->allResources();
+
+    std::ranges::sort(resources, [](const Resource* a, const Resource* b) { return a->name() < b->name(); });
+    ExportToModListDialog dlg(m_instance->name(), resources, this);
+    dlg.exec();
+}
 
 ExternalResourcesPage::ExternalResourcesPage(MinecraftInstance* instance, ResourceFolderModel* model, QWidget* parent)
     : QMainWindow(parent)
