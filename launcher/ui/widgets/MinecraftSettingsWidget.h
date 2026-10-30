@@ -53,6 +53,8 @@ class MinecraftSettingsWidget : public QWidget {
     void saveSettings();
 
    private:
+    void applyGlobalOptionsToAll();
+
     void openGlobalSettings();
     void updateAccountsMenu(SettingsObject& settings) const;
     bool isQuickPlaySupported();

@@ -294,6 +294,8 @@ set(MINECRAFT_SOURCES
     minecraft/ShortcutUtils.cpp
     minecraft/ShortcutUtils.h
     minecraft/Library.cpp
+    minecraft/GlobalOptions.cpp
+    minecraft/GlobalOptions.h
     minecraft/Library.h
     minecraft/MojangDownloadInfo.h
     minecraft/VanillaInstanceCreationTask.cpp
@@ -906,6 +908,8 @@ SET(LAUNCHER_SOURCES
     ui/pages/instance/LogPage.cpp
     ui/pages/instance/LogPage.h
     ui/pages/instance/InstanceSettingsPage.h
+    ui/pages/instance/OptionsPage.h
+    ui/pages/instance/OptionsPage.cpp
     ui/pages/instance/ScreenshotsPage.cpp
     ui/pages/instance/ScreenshotsPage.h
     ui/pages/instance/OtherLogsPage.cpp

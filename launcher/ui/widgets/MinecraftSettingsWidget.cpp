@@ -40,7 +40,13 @@
 #include "ui_MinecraftSettingsWidget.h"
 
 #include <QFileDialog>
+#include <QGroupBox>
+#include <QMessageBox>
+#include <QPushButton>
+#include <QVBoxLayout>
 #include "Application.h"
+#include "InstanceList.h"
+#include "minecraft/GlobalOptions.h"
 #include "BuildConfig.h"
 #include "Json.h"
 #include "minecraft/PackProfile.h"
@@ -63,6 +69,14 @@ MinecraftSettingsWidget::MinecraftSettingsWidget(MinecraftInstance* instance, QW
         m_ui->loaderGroup->hide();
         m_ui->countGameTime->hide();
         m_ui->latestMCVersionGroupBox->hide();
+
+        auto* globalOptionsBox = new QGroupBox(tr("Global &Options"), this);
+        auto* globalOptionsLayout = new QVBoxLayout(globalOptionsBox);
+        auto* applyAll = new QPushButton(tr("Apply to all instances..."), globalOptionsBox);
+        applyAll->setToolTip(tr("Replace the mods, resource packs and shader packs of every instance with the global options."));
+        globalOptionsLayout->addWidget(applyAll);
+        m_ui->verticalLayout_5->insertWidget(m_ui->verticalLayout_5->indexOf(m_ui->gameTimeGroupBox) + 1, globalOptionsBox);
+        connect(applyAll, &QPushButton::clicked, this, &MinecraftSettingsWidget::applyGlobalOptionsToAll);
     } else {
         m_javaSettings = new JavaSettingsWidget(m_instance, this);
         m_ui->javaScrollArea->setWidget(m_javaSettings);
@@ -159,6 +173,46 @@ MinecraftSettingsWidget::MinecraftSettingsWidget(MinecraftInstance* instance, QW
 MinecraftSettingsWidget::~MinecraftSettingsWidget()
 {
     delete m_ui;
+}
+
+void MinecraftSettingsWidget::applyGlobalOptionsToAll()
+{
+    const auto store = GlobalOptions::storePath();
+    if (!GlobalOptions::hasStore(store)) {
+        QMessageBox::information(this, tr("Global Options"),
+                                 tr("No global options have been saved yet. Open an instance, go to its Options page and use \"Copy to Global\" first."));
+        return;
+    }
+    auto* list = APPLICATION->instances();
+    if (QMessageBox::question(this, tr("Apply to all instances"),
+                              tr("Replace the resource packs and shader packs (and the mods of instances with the same Minecraft version and loader) "
+                                 "of all %1 instances with the global options?\nA backup of each instance is made first and can be restored from its "
+                                 "Options page.\n\n%2")
+                                  .arg(list->count())
+                                  .arg(GlobalOptions::describeStore(store))) != QMessageBox::Yes)
+        return;
+
+    QStringList problems;
+    int applied = 0;
+    for (int i = 0; i < list->count(); i++) {
+        auto* inst = list->at(i);
+        if (inst->isRunning()) {
+            problems << tr("%1: skipped, the game is running.").arg(inst->name());
+            continue;
+        }
+        const auto r = GlobalOptions::apply(store, GlobalOptions::targetFor(inst), GlobalOptions::backupRoot(inst));
+        if (!r.ok)
+            problems << tr("%1: %2").arg(inst->name(), r.error);
+        else
+            applied++;
+        for (const auto& w : r.warnings)
+            problems << tr("%1: %2").arg(inst->name(), w);
+    }
+    const auto summary = tr("Applied to %1 of %2 instances.").arg(applied).arg(list->count());
+    if (problems.isEmpty())
+        QMessageBox::information(this, tr("Apply to all instances"), summary);
+    else
+        QMessageBox::warning(this, tr("Apply to all instances"), summary + "\n\n" + problems.join("\n"));
 }
 
 void MinecraftSettingsWidget::loadSettings()

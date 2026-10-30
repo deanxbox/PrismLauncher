@@ -4,6 +4,7 @@ include(ECMMarkNonGuiExecutable)
 
 set(TEST_SOURCES
     FileSystem_test.cpp
+    GlobalOptions_test.cpp
     GZip_test.cpp
     GradleSpecifier_test.cpp
     MojangVersionFormat_test.cpp
