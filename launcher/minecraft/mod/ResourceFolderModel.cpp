@@ -718,6 +718,12 @@ void ResourceFolderModel::saveColumns(QTreeView* tree)
         }
     }
     m_instance->settings()->set(sizesSettingName, Json::fromMap(sizes));
+
+    QStringList order;
+    for (int v = 0; v < tree->header()->count(); ++v) {
+        order << m_columnNames.value(tree->header()->logicalIndex(v));
+    }
+    m_instance->settings()->set(QString("UI/%1_Page/ColumnOrder").arg(id()), order.join('\t'));
 }
 
 void ResourceFolderModel::loadColumns(QTreeView* tree)
@@ -783,6 +789,18 @@ void ResourceFolderModel::loadColumns(QTreeView* tree)
         const auto size = sizes.value(name).toInt();
         if (size > 0) {
             tree->header()->resizeSection(i, size);
+        }
+    }
+    tree->header()->blockSignals(false);
+
+    // Restore column order; the checkbox column (0) always stays first.
+    const auto savedOrder = m_instance->settings()->getOrRegisterSetting(QString("UI/%1_Page/ColumnOrder").arg(id()), "")->get().toString();
+    tree->header()->blockSignals(true);
+    int target = 1;
+    for (const auto& name : savedOrder.split('\t', Qt::SkipEmptyParts)) {
+        const int logical = m_columnNames.indexOf(name);
+        if (logical > 0) {
+            tree->header()->moveSection(tree->header()->visualIndex(logical), target++);
         }
     }
     tree->header()->blockSignals(false);

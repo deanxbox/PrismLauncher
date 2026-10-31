@@ -90,7 +90,13 @@ ExternalResourcesPage::ExternalResourcesPage(MinecraftInstance* instance, Resour
     // must come after setModel
     const auto& resizeModes = m_model->columnResizeModes();
     for (int i = 0; i < resizeModes.count(); ++i) {
-        m_ui->treeView->header()->setSectionResizeMode(i, resizeModes[i]);
+        const bool fixed = resizeModes[i] == QHeaderView::Fixed;
+        m_ui->treeView->header()->setSectionResizeMode(i, fixed ? QHeaderView::ResizeToContents : QHeaderView::Interactive);
+        if (resizeModes[i] == QHeaderView::Stretch) {
+            m_ui->treeView->header()->resizeSection(i, 300);
+        } else if (resizeModes[i] == QHeaderView::ResizeToContents) {
+            m_ui->treeView->resizeColumnToContents(i);
+        }
     }
 
     m_ui->treeView->installEventFilter(this);
@@ -146,11 +152,19 @@ ExternalResourcesPage::ExternalResourcesPage(MinecraftInstance* instance, Resour
 
     connect(viewHeader, &QHeaderView::customContextMenuRequested, this, &ExternalResourcesPage::showHeaderContextMenu);
 
-    // always use the smallest possible size to avoid wasted space
-    m_ui->treeView->header()->resizeSection(0, 0);
+    // Keep the enable checkbox visible and fill unused space without locking the other data columns.
+    viewHeader->setStretchLastSection(true);
+    viewHeader->setSectionsMovable(true);
 
     m_model->loadColumns(m_ui->treeView);
     connect(m_ui->treeView->header(), &QHeaderView::sectionResized, this, [this] { m_model->saveColumns(m_ui->treeView); });
+    connect(viewHeader, &QHeaderView::sectionMoved, this, [this, viewHeader] {
+        if (viewHeader->visualIndex(0) != 0) {  // keep the checkbox column first
+            QSignalBlocker block(viewHeader);
+            viewHeader->moveSection(viewHeader->visualIndex(0), 0);
+        }
+        m_model->saveColumns(m_ui->treeView);
+    });
     connect(m_ui->filterEdit, &QLineEdit::textChanged, this, &ExternalResourcesPage::filterTextChanged);
     updateActions();
 }
