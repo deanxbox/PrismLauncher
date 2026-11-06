@@ -29,7 +29,18 @@ Share one set of game options (mods, resource packs, shader pack selection) acro
 ## Screenshots page
 
 - Filter screenshots by date.
-- GIF screenshots are shown (thumbnails and copy-image use the first frame; the date uses the file's modified time).
+- GIF, WebP and AVIF screenshots are shown alongside PNGs (thumbnails and copy-image use the first frame; the date uses the file's modified time).
+- AVIF requires a Qt AVIF image plugin and its codec libraries. Without that decoder, AVIF files are hidden rather than shown with broken thumbnails.
+
+### AVIF runtime for Windows custom builds
+
+The standard Qt image-formats package does not include AVIF. This build was tested with the MSYS2 UCRT64 KDE image-formats plugin:
+
+- `mingw-w64-ucrt-x86_64-kimageformats` **6.26.0-1** (`kimg_avif.dll`)
+- `mingw-w64-ucrt-x86_64-libavif` **1.4.2-1**
+- Codec dependencies: `aom` **3.14.1-1**, `dav1d` **1.5.3-1**, `rav1e` **0.8.1-1**, `svt-av1` **4.1.0-1**, `libyuv` **1924.r2921.644251f25-1** (same package prefix).
+
+For a portable build, deploy `kimg_avif.dll` under `imageformats/` alongside the existing Qt plugins, and its codec DLLs beside the launcher executable. Match the Qt version and compiler runtime; include the packages' license notices. No AVIF library is linked directly into the launcher.
 
 ## Download mods dialog
 

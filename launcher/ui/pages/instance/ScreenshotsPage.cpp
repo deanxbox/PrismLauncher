@@ -43,6 +43,7 @@
 #include <QEvent>
 #include <QFileIconProvider>
 #include <QFileSystemModel>
+#include <QImageReader>
 #include <QKeyEvent>
 #include <QLineEdit>
 #include <QMenu>
@@ -117,7 +118,8 @@ class ThumbnailRunnable : public QRunnable {
         if (info.isDir()) {
             return;
         }
-        if (info.suffix().compare("png", Qt::CaseInsensitive) != 0 && info.suffix().compare("gif", Qt::CaseInsensitive) != 0) {
+        if (info.suffix().compare("png", Qt::CaseInsensitive) != 0 && info.suffix().compare("gif", Qt::CaseInsensitive) != 0 &&
+            info.suffix().compare("webp", Qt::CaseInsensitive) != 0 && info.suffix().compare("avif", Qt::CaseInsensitive) != 0) {
             return;
         }
         if (!m_cache->stale(m_path)) {
@@ -202,7 +204,7 @@ class FilterModel : public QSortFilterProxyModel {
         }
         if (role == Qt::DisplayRole || role == Qt::EditRole) {
             const QVariant result = model->data(mapToSource(proxyIndex), role);
-            static const QRegularExpression s_removeChars("\\.(png|gif)$", QRegularExpression::CaseInsensitiveOption);
+            static const QRegularExpression s_removeChars("\\.(png|gif|webp|avif)$", QRegularExpression::CaseInsensitiveOption);
             return result.toString().remove(s_removeChars);
         }
         if (role == Qt::DecorationRole) {
@@ -299,7 +301,12 @@ ScreenshotsPage::ScreenshotsPage(QString path, QWidget* parent)
     m_filterModel->setSourceModel(m_model.get());
     m_model->setFilter(QDir::Files);
     m_model->setReadOnly(false);
-    m_model->setNameFilters({ "*.png", "*.gif" });
+    QStringList formats{ "*.png", "*.gif", "*.webp" };
+    // AVIF needs an additional Qt image plugin; don't offer files we cannot decode.
+    if (QImageReader::supportedImageFormats().contains("avif")) {
+        formats << "*.avif";
+    }
+    m_model->setNameFilters(formats);
     m_model->setNameFilterDisables(false);
     // Sorts by modified date instead of creation date because that column is not available and would require subclassing, this should work
     // considering screenshots aren't modified after creation.

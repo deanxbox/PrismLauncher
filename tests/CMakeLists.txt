@@ -11,6 +11,7 @@ set(TEST_SOURCES
     MojangVersionFormat_test.cpp
     Library_test.cpp
     ResourceFolderModel_test.cpp
+    ScreenshotsPage_test.cpp
     ResourcePackParse_test.cpp
     TexturePackParse_test.cpp
     DataPackParse_test.cpp
